@@ -587,9 +587,11 @@ def main():
         st.session_state["selected_model"] = selected_model
 
         # AI Client Setup
+        client = None
         if user_api_key:
             try:
                 client = InferenceClient(token=user_api_key)
+                st.session_state["ai_client"] = client
             except Exception as e:
                 # st.error(f"Failed to initialize AI client: {e}")
                 print(f"Failed to initialize AI client: {e}")
@@ -2167,7 +2169,10 @@ def main():
             # Toggle for simplified language
             simplify_mode = st.toggle("Simplify for Non-Lawyers", help="Switch to plain, easy-to-understand English.")
             
-            if client:
+            # Use client from session state or local scope
+            active_client = st.session_state.get("ai_client") or client
+            
+            if active_client:
                 with st.spinner("Generating summary with AI..."):
                     try:
                         # Construct prompt based on toggle
@@ -2181,7 +2186,7 @@ def main():
                             {"role": "user", "content": prompt}
                         ]
                         
-                        response = client.chat_completion(
+                        response = active_client.chat_completion(
                             model=st.session_state.get("selected_model", "mistralai/Mistral-7B-Instruct-v0.3"),
                             messages=messages,
                             max_tokens=500
@@ -2294,7 +2299,7 @@ def main():
                         st.markdown(f"""<div class="red-flag-content">"...{highlighted_snippet}..."</div><div style="margin-bottom: 10px;"></div>""", unsafe_allow_html=True)
                         
                     # Optional: AI Explanation Button per card
-                    if client:
+                    if active_client:
                         # Create a unique key for each button
                         btn_key = f"explain_{category}"
                         if st.button(f"🤖 Explain Risks of {category}", key=btn_key):
@@ -2303,7 +2308,7 @@ def main():
                                     prompt = f"Explain why a '{category}' clause in a contract is a potential red flag. Keep it to 2 sentences. Context: {snippets[0]}"
                                     messages = [{"role": "user", "content": prompt}]
                                     
-                                    response = client.chat_completion(
+                                    response = active_client.chat_completion(
                                         model=st.session_state.get("selected_model", "mistralai/Mistral-7B-Instruct-v0.3"),
                                         messages=messages,
                                         max_tokens=150
@@ -2410,12 +2415,12 @@ def main():
             with st.spinner("Thinking..."):
                 if not user_api_key:
                     response_text = "Please enter a valid Hugging Face Token in the sidebar to use the chat."
-                    # We can't use st.warning here effectively as it might disappear on rerun, but adding to history is better
                 else:
                     try:
-                        # Ensure client is available
-                        if client is None:
-                            client = InferenceClient(token=user_api_key)
+                        # Use active client
+                        active_client = st.session_state.get("ai_client") or client
+                        if active_client is None:
+                            active_client = InferenceClient(token=user_api_key)
                         
                         # Use full_text from the CURRENTLY SELECTED document as context
                         current_context = ""
@@ -2431,7 +2436,7 @@ def main():
                             {"role": "user", "content": prompt}
                         ]
                         
-                        response = client.chat_completion(
+                        response = active_client.chat_completion(
                             model=st.session_state.get("selected_model", "mistralai/Mistral-7B-Instruct-v0.3"),
                             messages=messages,
                             max_tokens=300
