@@ -1,0 +1,16 @@
+# Local Python environment
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Google API Secrets (CRITICAL: DO NOT UPLOAD THESE)
+credentials.json
+token.json
+
+# Environment variables
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
