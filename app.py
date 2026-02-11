@@ -524,27 +524,32 @@ def main():
         # 3. API Key & Settings (HIDDEN)
         # st.markdown('<div class="settings-label">SETTINGS</div>', unsafe_allow_html=True)
         
-        # Try to get API key from environment variable first
-        env_api_key = os.getenv("HF_TOKEN")
-        user_api_key = env_api_key # Auto-use env key
+        # Try to get API key from Streamlit secrets (for deployment) or environment variable (for local)
+        env_api_key = st.secrets.get("HF_TOKEN") or os.getenv("HF_TOKEN")
         
-        # user_api_key = st.text_input(
-        #     "Hugging Face Access Token", 
-        #     value=env_api_key if env_api_key else "", 
-        #     type="password",
-        #     placeholder="HF Token (hf_...)",
-        #     label_visibility="collapsed"
-        # )
+        # If still not found, check if it's in session state (from manual input)
+        user_api_key = st.session_state.get("user_api_key", env_api_key)
         
-        # Save Key Logic
-        # if user_api_key and user_api_key != env_api_key:
-        #     if st.button("💾 Save Key for Future"):
-        #         with open(".env", "w") as f:
-        #             f.write(f"HF_TOKEN={user_api_key}")
-        #         os.environ["HF_TOKEN"] = user_api_key
-        #         st.success("Saved!")
-        #         time.sleep(0.5)
-        #         st.rerun()
+        if not user_api_key:
+            st.markdown('<div class="settings-label" style="margin-top: 20px;">AI SETTINGS</div>', unsafe_allow_html=True)
+            input_key = st.text_input(
+                "Hugging Face Access Token", 
+                type="password",
+                placeholder="hf_...",
+                help="Enter your Hugging Face token to enable AI Analysis. You can get one at hf.co/settings/tokens"
+            )
+            
+            if input_key:
+                if st.button("💾 Apply Token"):
+                    st.session_state["user_api_key"] = input_key
+                    st.success("Token applied!")
+                    st.rerun()
+        else:
+            # Hide input if key exists, but allow clearing it
+            st.session_state["user_api_key"] = user_api_key
+            if st.sidebar.button("🗑️ Clear Token"):
+                del st.session_state["user_api_key"]
+                st.rerun()
             
         # Status Indicator
         if user_api_key or os.getenv("HF_TOKEN"):
