@@ -30,37 +30,52 @@ SCOPES = ['https://www.googleapis.com/auth/calendar']
 def sync_deadlines_to_calendar(deadlines, filename):
     """
     Syncs a list of deadlines to the user's primary Google Calendar.
-    deadlines: list of dicts {'obligation': str, 'date': str (YYYY-MM-DD)}
+    Supports both local and deployed environments.
     """
     creds = None
-    # The file token.json stores the user's access and refresh tokens, and is
-    # created automatically when the authorization flow completes for the first time.
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
     
-    # If there are no (valid) credentials available, let the user log in.
+    # 1. Try to get creds from Session State (for the current user)
+    if 'google_creds' in st.session_state:
+        creds = Credentials.from_authorized_user_info(json.loads(st.session_state.google_creds), SCOPES)
+
+    # 2. If no valid creds in session, check for authorization code from user input
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             try:
                 creds.refresh(Request())
+                st.session_state.google_creds = creds.to_json()
             except Exception:
-                creds = None # Force re-auth
+                creds = None
         
         if not creds:
             if not os.path.exists('credentials.json'):
-                return False, "Missing 'credentials.json'. Please add your Google Cloud credentials to the project root to enable Calendar Sync."
+                return False, "Missing 'credentials.json'. Please add your Google Cloud credentials to the project."
             
-            try:
-                flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-                # Run local server for auth - FIXED PORT 8080 for Google Console matching
-                creds = flow.run_local_server(port=8080)
-            except Exception as e:
-                return False, f"Authentication failed: {str(e)}"
-        
-        # Save the credentials for the next run
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
+            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
+            # Use a redirect URI that doesn't require a local browser
+            flow.redirect_uri = 'urn:ietf:wg:oauth:2.0:oob'
+            
+            auth_url, _ = flow.authorization_url(prompt='consent')
+            
+            st.markdown(f"### 🔐 Google Authentication Required")
+            st.info("To sync deadlines, you need to authorize LegalEase to access your calendar.")
+            st.markdown(f"[👉 Click here to authorize LegalEase]({auth_url})")
+            
+            auth_code = st.text_input("Enter the code from the Google page here:")
+            
+            if auth_code:
+                try:
+                    flow.fetch_token(code=auth_code)
+                    creds = flow.credentials
+                    st.session_state.google_creds = creds.to_json()
+                    st.success("Authentication successful! Click the sync button again to finish.")
+                    st.rerun()
+                except Exception as e:
+                    return False, f"Failed to get token: {str(e)}"
+            else:
+                return False, "Waiting for Google Authorization..."
 
+    # 3. Use the credentials to sync
     try:
         service = build('calendar', 'v3', credentials=creds)
         
@@ -2083,6 +2098,11 @@ def main():
 
         # Render custom file buttons
         docs_to_remove = []
+        
+        # Helper: select a document and jump to Dashboard via widget callback
+        def _select_doc(doc_name):
+            st.session_state.current_doc = doc_name
+            st.session_state.nav_selection = "🏠 Dashboard"
         for doc_name in doc_keys:
             # Layout: Button for doc (takes most space), Delete button (fixed small width)
             # We use a tighter ratio to keep the X close to the right edge but not too far
@@ -2095,10 +2115,14 @@ def main():
             with col1:
                 # Add file icon emoji to name
                 display_name = f"📄 {doc_name}"
-                if st.button(display_name, key=f"btn_{doc_name}", type=btn_type, use_container_width=True):
-                    st.session_state.current_doc = doc_name
-                    st.session_state.nav_selection = "🏠 Dashboard"
-                    st.rerun()
+                st.button(
+                    display_name,
+                    key=f"btn_{doc_name}",
+                    type=btn_type,
+                    use_container_width=True,
+                    on_click=_select_doc,
+                    args=(doc_name,)
+                )
             
             with col2:
                 # Circular 'X' button for delete
