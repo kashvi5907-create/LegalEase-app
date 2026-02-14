@@ -428,9 +428,9 @@ def render_landing_page():
                 <div class="logo-text">LegalEase</div>
             </div>
             <div class="nav-items">
-                <span class="nav-item">Product</span>
-                <span class="nav-item">Solutions</span>
-                <span class="nav-item">Pricing</span>
+                <span class="nav-item">Home</span>
+                <span class="nav-item">About Us</span>
+                <span class="nav-item">Contact Us</span>
                 <span class="nav-item">Login</span>
             </div>
         </div>
@@ -560,11 +560,8 @@ def main():
                     st.success("Token applied!")
                     st.rerun()
         else:
-            # Hide input if key exists, but allow clearing it
+            # Hide input if key exists (no visible Clear Token button)
             st.session_state["user_api_key"] = user_api_key
-            if st.sidebar.button("🗑️ Clear Token"):
-                del st.session_state["user_api_key"]
-                st.rerun()
             
         # Status Indicator
         if user_api_key or os.getenv("HF_TOKEN"):
@@ -2099,10 +2096,9 @@ def main():
         # Render custom file buttons
         docs_to_remove = []
         
-        # Helper: select a document and jump to Dashboard via widget callback
+        # Helper: select a document without changing the active tab
         def _select_doc(doc_name):
             st.session_state.current_doc = doc_name
-            st.session_state.nav_selection = "🏠 Dashboard"
         for doc_name in doc_keys:
             # Layout: Button for doc (takes most space), Delete button (fixed small width)
             # We use a tighter ratio to keep the X close to the right edge but not too far
