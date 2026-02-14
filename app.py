@@ -14,10 +14,11 @@ import numpy as np
 from PIL import Image
 import json
 import datetime
+import urllib.parse
 
 # Google Calendar API Imports
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google_auth_oauthlib.flow import InstalledAppFlow, Flow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
@@ -38,7 +39,7 @@ def sync_deadlines_to_calendar(deadlines, filename):
     if 'google_creds' in st.session_state:
         creds = Credentials.from_authorized_user_info(json.loads(st.session_state.google_creds), SCOPES)
 
-    # 2. If no valid creds in session, check for authorization code from user input
+    # 2. If no valid creds in session, attempt Web OAuth (deployed) or Local (dev)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             try:
@@ -51,29 +52,51 @@ def sync_deadlines_to_calendar(deadlines, filename):
             if not os.path.exists('credentials.json'):
                 return False, "Missing 'credentials.json'. Please add your Google Cloud credentials to the project."
             
-            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-            # Use a redirect URI that doesn't require a local browser
-            flow.redirect_uri = 'urn:ietf:wg:oauth:2.0:oob'
-            
-            auth_url, _ = flow.authorization_url(prompt='consent')
-            
-            st.markdown(f"### 🔐 Google Authentication Required")
-            st.info("To sync deadlines, you need to authorize LegalEase to access your calendar.")
-            st.markdown(f"[👉 Click here to authorize LegalEase]({auth_url})")
-            
-            auth_code = st.text_input("Enter the code from the Google page here:")
-            
-            if auth_code:
+            # Prefer Web OAuth flow for deployed apps if APP_BASE_URL is provided
+            app_base = st.secrets.get("APP_BASE_URL") or os.getenv("APP_BASE_URL")
+            if app_base:
+                # Ensure trailing slash once
+                app_base = app_base.rstrip("/")
+                redirect_uri = f"{app_base}/"
                 try:
-                    flow.fetch_token(code=auth_code)
-                    creds = flow.credentials
-                    st.session_state.google_creds = creds.to_json()
-                    st.success("Authentication successful! Click the sync button again to finish.")
-                    st.rerun()
+                    web_flow = Flow.from_client_secrets_file(
+                        'credentials.json',
+                        scopes=SCOPES,
+                        redirect_uri=redirect_uri
+                    )
+                    auth_url, _ = web_flow.authorization_url(
+                        access_type='offline',
+                        include_granted_scopes='true',
+                        prompt='consent'
+                    )
+                    
+                    st.markdown(f"### 🔐 Google Authentication Required")
+                    st.info("To sync deadlines, authorize LegalEase to access your calendar.")
+                    st.markdown(f"[👉 Click here to authorize LegalEase]({auth_url})")
+                    
+                    # Handle callback via query params
+                    qp = dict(st.query_params)
+                    code_val = qp.get("code")
+                    if code_val:
+                        # Ensure we pass the exact authorization_response URL to Google
+                        auth_response = f"{redirect_uri}?{urllib.parse.urlencode(qp)}"
+                        web_flow.fetch_token(authorization_response=auth_response)
+                        creds = web_flow.credentials
+                        st.session_state.google_creds = creds.to_json()
+                        # Clear query params to avoid repeat fetch
+                        st.query_params.clear()
+                    else:
+                        return False, "Waiting for Google Authorization..."
                 except Exception as e:
-                    return False, f"Failed to get token: {str(e)}"
+                    return False, f"Auth setup error: {str(e)}"
             else:
-                return False, "Waiting for Google Authorization..."
+                # Fallback to local dev flow (opens a browser on localhost)
+                try:
+                    local_flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
+                    creds = local_flow.run_local_server(port=8080)
+                    st.session_state.google_creds = creds.to_json()
+                except Exception as e:
+                    return False, f"Authentication failed: {str(e)}"
 
     # 3. Use the credentials to sync
     try:
