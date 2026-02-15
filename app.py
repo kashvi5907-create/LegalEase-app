@@ -2323,10 +2323,15 @@ def main():
                     pass
 
                 for category, snippets in found_red_flags.items():
-                    st.markdown(f"""
-                    <div class="red-flag-card">
-                        <div class="red-flag-title">🚩 {category}</div>
-                    """, unsafe_allow_html=True)
+                    # Category heading outside the red box, no icon
+                    st.markdown(
+                        f"<h1 style='font-size: 1.2rem; font-weight: 600; margin: 24px 0 12px 0;'>{category}</h1>",
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown(
+                        "<div class=\"red-flag-card\">",
+                        unsafe_allow_html=True,
+                    )
                     
                     for snippet in snippets:
                         # Clean and escape snippet to prevent Markdown code blocks and broken HTML
