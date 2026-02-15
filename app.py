@@ -280,15 +280,12 @@ def render_landing_page():
             gap: 10px;
         }
         .logo-icon {
-            width: 32px;
             height: 32px;
-            background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%);
-            border-radius: 6px;
-            color: #ffffff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
+        }
+        .logo-icon img {
+            height: 32px;
+            width: auto;
+            display: block;
         }
         .logo-text {
             font-size: 1.25rem;
@@ -447,7 +444,9 @@ def render_landing_page():
         <!-- Navbar Structure -->
         <div class="navbar">
             <div class="logo-box">
-                <div class="logo-icon">L</div>
+                <div class="logo-icon">
+                    <img src="logo.svg" alt="LegalEase Logo">
+                </div>
                 <div class="logo-text">LegalEase</div>
             </div>
             <div class="nav-items">
@@ -535,7 +534,9 @@ def main():
         # 1. Custom Logo
         st.markdown("""
             <div class="logo-box">
-                <div class="logo-icon">L</div>
+                <div class="logo-icon">
+                    <img src="logo.svg" alt="LegalEase Logo">
+                </div>
                 <div class="logo-text">LegalEase</div>
             </div>
         """, unsafe_allow_html=True)
@@ -2323,16 +2324,12 @@ def main():
                     pass
 
                 for category, snippets in found_red_flags.items():
-                    # Category heading outside the red box, no icon
+                    # Show only the red flag name as a heading (no box below)
                     st.markdown(
                         f"<h1 style='font-size: 1.2rem; font-weight: 600; margin: 24px 0 12px 0;'>{category}</h1>",
                         unsafe_allow_html=True,
                     )
-                    st.markdown(
-                        "<div class=\"red-flag-card\">",
-                        unsafe_allow_html=True,
-                    )
-                    
+
                     for snippet in snippets:
                         # Clean and escape snippet to prevent Markdown code blocks and broken HTML
                         import html
@@ -2372,7 +2369,6 @@ def main():
                                     else:
                                         st.error(f"AI unavailable. Error: {error_msg}")
 
-                    st.markdown("</div>", unsafe_allow_html=True)
             else:
                 st.success("No common red flags found in the scanned text.")
 
