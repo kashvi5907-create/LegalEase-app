@@ -15,6 +15,7 @@ from PIL import Image
 import json
 import datetime
 import urllib.parse
+import base64
 
 # Google Calendar API Imports
 from google.oauth2.credentials import Credentials
@@ -24,6 +25,23 @@ from googleapiclient.discovery import build
 
 # Load environment variables
 load_dotenv()
+
+# Load logo as data URI for reliable display in HTML blocks
+LOGO_DATA_URI = ""
+try:
+    with open("logo.svg", "rb") as _logo_file:
+        LOGO_DATA_URI = (
+            "data:image/svg+xml;base64,"
+            + base64.b64encode(_logo_file.read()).decode("utf-8")
+        )
+except FileNotFoundError:
+    LOGO_DATA_URI = ""
+
+LOGO_IMG_TAG = (
+    f'<img src="{LOGO_DATA_URI}" alt="LegalEase Logo">'
+    if LOGO_DATA_URI
+    else "<span class='logo-fallback'>L</span>"
+)
 
 # --- GOOGLE CALENDAR HELPER ---
 SCOPES = ['https://www.googleapis.com/auth/calendar']
@@ -444,9 +462,7 @@ def render_landing_page():
         <!-- Navbar Structure -->
         <div class="navbar">
             <div class="logo-box">
-                <div class="logo-icon">
-                    <img src="logo.svg" alt="LegalEase Logo">
-                </div>
+                <div class="logo-icon">""" + LOGO_IMG_TAG + """</div>
                 <div class="logo-text">LegalEase</div>
             </div>
             <div class="nav-items">
@@ -532,14 +548,17 @@ def main():
     # --- Sidebar Navigation (DASHBOARD ONLY) ---
     with st.sidebar:
         # 1. Custom Logo
-        st.markdown("""
+        st.markdown(
+            f"""
             <div class="logo-box">
                 <div class="logo-icon">
-                    <img src="logo.svg" alt="LegalEase Logo">
+                    {LOGO_IMG_TAG}
                 </div>
                 <div class="logo-text">LegalEase</div>
             </div>
-        """, unsafe_allow_html=True)
+            """,
+            unsafe_allow_html=True,
+        )
         
         # Initialize navigation state if not exists
         if "nav_selection" not in st.session_state:
