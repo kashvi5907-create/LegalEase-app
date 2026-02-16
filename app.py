@@ -625,11 +625,13 @@ def main():
 
         # Model Selection
         # st.markdown('<div class="settings-label" style="margin-top: 20px;">AI MODEL</div>', unsafe_allow_html=True)
+        # NOTE: Default model must be available on your Hugging Face account.
+        # meta-llama/Meta-Llama-3-8B-Instruct is gated, so we use an open model by default.
         model_options = [
-            "meta-llama/Meta-Llama-3-8B-Instruct",
+            "mistralai/Mistral-7B-Instruct-v0.2",
             "HuggingFaceH4/zephyr-7b-beta",
             "microsoft/Phi-3-mini-4k-instruct",
-            "mistralai/Mistral-7B-Instruct-v0.2" 
+            "meta-llama/Meta-Llama-3-8B-Instruct",
         ]
         
         # selected_model = st.selectbox(
