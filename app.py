@@ -46,6 +46,45 @@ LOGO_IMG_TAG = (
 # --- GOOGLE CALENDAR HELPER ---
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
+
+def call_chat_with_fallback(client, messages, max_tokens):
+    preferred = []
+    current = st.session_state.get("selected_model")
+    if current:
+        preferred.append(current)
+    preferred.extend(
+        [
+            "HuggingFaceH4/zephyr-7b-beta",
+            "mistralai/Mistral-7B-Instruct-v0.2",
+            "microsoft/Phi-3-mini-4k-instruct",
+        ]
+    )
+    seen = set()
+    models = []
+    for m in preferred:
+        if m and m not in seen:
+            seen.add(m)
+            models.append(m)
+    last_error = None
+    for model in models:
+        try:
+            response = client.chat_completion(
+                model=model,
+                messages=messages,
+                max_tokens=max_tokens,
+            )
+            st.session_state["selected_model"] = model
+            return response
+        except Exception as e:
+            msg = str(e)
+            last_error = e
+            if "model_not_supported" in msg or "The requested model" in msg:
+                continue
+            raise
+    if last_error:
+        raise last_error
+    raise RuntimeError("No supported model found")
+
 def sync_deadlines_to_calendar(deadlines, filename):
     """
     Syncs a list of deadlines to the user's primary Google Calendar.
@@ -2246,15 +2285,11 @@ def main():
                         else:
                             prompt = f"Summarize the following contract in exactly 3 concise bullet points (start each point with '* '). Focus on the main purpose and key obligations:\n\n{full_text}"
                             
-                        # Use Hugging Face Inference Client
-                        messages = [
-                            {"role": "user", "content": prompt}
-                        ]
-                        
-                        response = active_client.chat_completion(
-                            model=st.session_state.get("selected_model", "mistralai/Mistral-7B-Instruct-v0.3"),
-                            messages=messages,
-                            max_tokens=500
+                        messages = [{"role": "user", "content": prompt}]
+                        response = call_chat_with_fallback(
+                            active_client,
+                            messages,
+                            max_tokens=500,
                         )
                         
                         response_text = response.choices[0].message.content
@@ -2364,20 +2399,17 @@ def main():
                         
                         st.markdown(f"""<div class="red-flag-content">"...{highlighted_snippet}..."</div><div style="margin-bottom: 10px;"></div>""", unsafe_allow_html=True)
                         
-                    # Optional: AI Explanation Button per card
                     if active_client:
-                        # Create a unique key for each button
                         btn_key = f"explain_{category}"
                         if st.button(f"🤖 Explain Risks of {category}", key=btn_key):
                             with st.spinner("Consulting AI..."):
                                 try:
                                     prompt = f"Explain why a '{category}' clause in a contract is a potential red flag. Keep it to 2 sentences. Context: {snippets[0]}"
                                     messages = [{"role": "user", "content": prompt}]
-                                    
-                                    response = active_client.chat_completion(
-                                        model=st.session_state.get("selected_model", "mistralai/Mistral-7B-Instruct-v0.3"),
-                                        messages=messages,
-                                        max_tokens=150
+                                    response = call_chat_with_fallback(
+                                        active_client,
+                                        messages,
+                                        max_tokens=150,
                                     )
                                     explanation_text = response.choices[0].message.content
                                     st.markdown(f'<div class="explanation-box"><b>AI Insight:</b> {explanation_text}</div>', unsafe_allow_html=True)
